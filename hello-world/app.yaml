@@ -1,0 +1,82 @@
+# Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hello-world
+  namespace: hello-world
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1 # How many pods at max (replicas + X)
+      maxUnavailable: 0 # How many pods at min (replicas - X)
+  selector:
+    matchLabels:
+      app: hello-world
+  # Pod
+  template:
+    metadata:
+      labels:
+        app: hello-world
+    spec:
+      containers:
+        - name: hello-world
+          image: goloroden/hello-world:latest
+          env:
+            - name: MESSAGE
+              value: Hey!
+          ports:
+            - name: http
+              containerPort: 3000 # Internal port of Docker container
+          resources:
+            requests:
+              cpu: 100m # Tenth part of CPU
+              memory: 256Mi
+            limits:
+              cpu: 1000m # Whole CPU
+              memory: 512Mi
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+---
+# Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: hello-world-service
+  namespace: hello-world
+spec:
+  selector:
+    app: hello-world
+  ports:
+    - name: http
+      port: 8080 # External port
+      targetPort: http
+  type: LoadBalancer
+---
+# Ingress controller
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: hello-world-ingress-controller
+  namespace: hello-world
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: hello-world
+                port:
+                  name: http
